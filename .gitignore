@@ -1,0 +1,22 @@
+# Virtual Environment
+venv/
+ENV/
+env/
+.env
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDEs/Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+*.xlsx
+*.csv
+logs/
+tests/verify_evaluator.py
