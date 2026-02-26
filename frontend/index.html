@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BackTrans Metrics Hub | تقييم الترجمات الإسلامية</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+Arabic:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="background-blobs">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+
+    <main class="container">
+      <header class="hero">
+        <h1 class="title">BackTrans <span class="accent">Metrics Hub</span></h1>
+        <p class="subtitle">
+          نظام ذكي لتقييم جودة الترجمات الإسلامية بدقة عالية
+        </p>
+      </header>
+
+      <section class="upload-card">
+        <div class="card-glass">
+          <div id="drop-zone" class="drop-zone">
+            <div class="drop-content">
+              <div class="icon-wrapper">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="upload-icon"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <h3>اسحب ملف Excel هنا</h3>
+              <p>أو انقر لاختيار ملف من جهازك</p>
+              <input type="file" id="file-input" accept=".xlsx, .xls" hidden />
+            </div>
+          </div>
+
+          <div id="file-info" class="file-info hidden">
+            <div class="file-details">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="file-icon"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                ></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <span id="file-name">filename.xlsx</span>
+            </div>
+            <button id="remove-file" class="btn-icon">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <div class="actions">
+            <button id="process-btn" class="btn-primary" disabled>
+              <span class="btn-text">بدء التقييم</span>
+              <div class="loader hidden"></div>
+            </button>
+          </div>
+
+          <div id="status-message" class="status-message hidden"></div>
+        </div>
+      </section>
+
+      <section class="info-grid">
+        <div class="info-item">
+          <span class="info-label">الموديل المستخدم</span>
+          <span class="info-value">Gemini 3 Flash</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">دقة التقييم</span>
+          <span class="info-value">A - J Scale</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">المخرج</span>
+          <span class="info-value">Excel file with Scores & Justification</span>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
