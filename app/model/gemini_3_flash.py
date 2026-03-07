@@ -1,8 +1,12 @@
-import re
+import time
 from google import genai
 from google.genai import types
 from .LLMModel import LLMModel
 from .llm_evaluator import LLMEvaluator
+from tenacity import retry, stop_after_attempt, wait_exponential, before_sleep_log
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Gemini3Flash(LLMModel):
@@ -17,37 +21,57 @@ class Gemini3Flash(LLMModel):
             top_p=0.9,
         )
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=2, max=10),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True
+    )
     def evaluate(self, original_text: str, translation: str, source_lang: str, target_lang: str) -> float:
-        prompt = LLMEvaluator.get_evaluation_prompt(original_text, translation, target_lang)
+        start = time.time()
+        prompt = LLMEvaluator.get_evaluation_prompt(original_text, translation, target_lang, include_reason=False)
         try:
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=prompt,
                 config=self.generation_config,
             )
-            text_response = response.text.strip()
-            return LLMEvaluator.parse_grade(text_response)
+            score, _ = LLMEvaluator.parse_response(response.text, include_reason=False)
+            print(f"  [Gemini] evaluate took {time.time()-start:.2f}s")
+            return score
         except Exception as e:
-            print(f"Error in evaluate: {e}")
-            return 0.1
+            print(f"Error in evaluate (Row context unknown): {str(e)}")
+            raise
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=2, max=10),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True
+    )
     def evaluate_with_justification(self, original_text: str, translation: str, source_lang: str, target_lang: str) -> tuple[float, str]:
-        score = self.evaluate(original_text, translation, source_lang, target_lang)
-        
-        just_prompt = LLMEvaluator.get_justification_prompt(original_text, translation, target_lang, score)
+        start = time.time()
+        prompt = LLMEvaluator.get_evaluation_prompt(original_text, translation, target_lang, include_reason=True)
         try:
             response = self.client.models.generate_content(
                 model=self.model_name,
-                contents=just_prompt,
+                contents=prompt,
                 config=self.generation_config,
             )
-            justification = response.text.strip()
-            return score, justification
+            score, justification = LLMEvaluator.parse_response(response.text, include_reason=True)
+            print(f"  [Gemini] evaluate_with_justification took {time.time()-start:.2f}s")
+            return score, justification or ""
         except Exception as e:
-            print(f"Error in get_justification: {e}")
-            return score, ""
+            print(f"Error in evaluate_with_justification (Row context unknown): {str(e)}")
+            raise
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=2, max=10),
+        reraise=True
+    )
     def translate(self, text: str, source_lang: str, target_lang: str) -> str:
+        start = time.time()
         prompt = (
             f"You are a strict translation engine. Your task is to translate the following text from {source_lang} to {target_lang}.\n"
             "CRITICAL RULES:\n"
@@ -65,7 +89,8 @@ class Gemini3Flash(LLMModel):
                 contents=prompt,
                 config=self.generation_config,
             )
+            print(f"  [Gemini] translate took {time.time()-start:.2f}s")
             return response.text.strip()
         except Exception as e:
-            print(f"Error in translate: {e}")
+            print(f"Error in translate: {str(e)}")
             return ""

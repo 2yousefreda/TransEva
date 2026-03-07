@@ -74,6 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const formData = new FormData();
     formData.append("file", selectedFile);
+    formData.append("get_justification", document.getElementById("justification-toggle").checked);
 
     try {
       const response = await fetch("/evaluate", {

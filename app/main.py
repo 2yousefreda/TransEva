@@ -1,6 +1,6 @@
 import io
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import os
@@ -26,12 +26,18 @@ def read_root():
     return FileResponse(os.path.join(frontend_dir, "index.html"))
 
 @app.post("/evaluate")
-def evaluate_excel(file: UploadFile = File(...)):
+def evaluate_excel(get_justification: str = Form("true"), file: UploadFile = File(...)):
+    # Robustly parse the boolean from the form string
+    just_bool = str(get_justification).lower() == "true"
+    print(f"DEBUG: get_justification received as '{get_justification}', interpreted as {just_bool}")
+    
     df = pd.read_excel(file.file)
-    processed_df = evaluation_service.evaluate_excel_process(df)
+    processed_df = evaluation_service.evaluate_excel_process(df, get_justification=just_bool)
     
     output = io.BytesIO()
+    print("Generating Excel output...")
     processed_df.to_excel(output, index=False)
+    print("Excel generation completed.")
     output.seek(0)
 
     from fastapi import Response

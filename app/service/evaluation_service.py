@@ -1,6 +1,7 @@
-from app.model.gemini_3_flash import Gemini3Flash
 import pandas as pd
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from app.core.config import settings
 
 
 class EvaluationService:
@@ -13,7 +14,7 @@ class EvaluationService:
         'ar': ['arabic', 'ar', 'عربي']
     }
 
-    def __init__(self, llm_model: Gemini3Flash):
+    def __init__(self, llm_model):
         self.llm_model = llm_model
 
     def detect_language(self, header: str) -> str:
@@ -23,21 +24,34 @@ class EvaluationService:
                 return lang_code
         return 'en'
 
-    def _process_row(self, index, source_text, translated_text, source_lang, target_lang, total):
+    def _process_row(self, index, source_text, translated_text, source_lang, target_lang, total, get_justification):
         """Process a single row: evaluate, back-translate, and evaluate back-translation."""
-        print(f"Processing row {index+1}/{total}...")
+        start_time = time.time()
+        print(f"Starting row {index+1}/{total}...")
+        
+        # Add a small delay to avoid hitting Rate Limits
+        if settings.API_REQUEST_DELAY > 0:
+            time.sleep(settings.API_REQUEST_DELAY)
 
-        score_translation, justification_translation = self.llm_model.evaluate_with_justification(
-            source_text, translated_text, source_lang, target_lang
-        )
+        if get_justification:
+            score_translation, justification_translation = self.llm_model.evaluate_with_justification(
+                source_text, translated_text, source_lang, target_lang
+            )
+        else:
+            score_translation = self.llm_model.evaluate(
+                source_text, translated_text, source_lang, target_lang
+            )
+            justification_translation = None
 
         back_translation = self.llm_model.translate(
             translated_text, target_lang, source_lang
         )
 
+        duration = time.time() - start_time
+        print(f"Finished row {index+1}/{total} ✅ (Took {duration:.2f}s)")
         return index, score_translation, justification_translation, back_translation
 
-    def evaluate_excel_process(self, df: pd.DataFrame) -> pd.DataFrame:
+    def evaluate_excel_process(self, df: pd.DataFrame, get_justification: bool = True) -> pd.DataFrame:
 
         if len(df.columns) < 2:
             raise ValueError("Excel file must contain at least two columns.")
@@ -54,12 +68,13 @@ class EvaluationService:
 
         total = len(df)
 
+        # Reduced max_workers to be more stable with API rate limits
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {
                 executor.submit(
                     self._process_row,
                     index, row[source_column], row[target_column],
-                    source_lang, target_lang, total
+                    source_lang, target_lang, total, get_justification
                 ): index
                 for index, row in df.iterrows()
             }
@@ -72,6 +87,10 @@ class EvaluationService:
                     df.at[idx, "back_translation"] = back_t
                 except Exception as e:
                     print(f"Error processing row: {e}")
+
+        if not get_justification:
+            print("DEBUG: Dropping justification_translation column as requested.")
+            df.drop(columns=["justification_translation"], inplace=True)
 
         print("Done! All rows processed.")
         return df

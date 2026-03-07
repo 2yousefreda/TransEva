@@ -1,3 +1,11 @@
+import logging
+import re
+from google import genai
+from typing import Dict, Any
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+logger = logging.getLogger(__name__)
+
 class LLMEvaluator:
     """Evaluates translation quality using Gemini LLM as judge"""
     
@@ -63,52 +71,55 @@ You are an expert linguist and theologian specializing in Arabic-to-{target_lang
 {translation}
 
 ### Output Instructions
-Respond with ONLY a single letter (A, B, C, D, E, F, G, H, I, or J).
-Do not include any explanation, reasoning, or additional text.
-Just the letter grade.
-"""
-
-    JUSTIFICATION_PROMPT = """
-You are an expert linguist reviewing Arabic-to-{target_language} translations of Islamic literature.
-You are given the original Arabic text, the translation, and the numeric score previously assigned.
-
-Write ONE concise Arabic sentence justifying the score.
-- Be direct and specific.
-- Do not use filler words or introductory phrases (e.g., "The score is low because...", "Based on the text...").
-- Focus immediately on the error or quality.
-- Do not output English.
-
-### Input
-**Source Text (Arabic):**
-{source}
-
-**Target Text ({target_language}):**
-{translation}
-
-**Assigned Score (0.10 to 1.00):**
-{score:.2f}
+{output_format_instructions}
 """
 
     @classmethod
-    def get_evaluation_prompt(cls, source: str, translation: str, target_language: str) -> str:
+    def get_evaluation_prompt(cls, source: str, translation: str, target_language: str, include_reason: bool = False) -> str:
+        output_format_instructions = cls._build_output_format_instructions(include_reason)
         return cls.EVALUATION_PROMPT.format(
             source=source,
             translation=translation,
-            target_language=target_language
-        )
-
-    @classmethod
-    def get_justification_prompt(cls, source: str, translation: str, target_language: str, score: float) -> str:
-        return cls.JUSTIFICATION_PROMPT.format(
-            source=source,
-            translation=translation,
             target_language=target_language,
-            score=score
+            output_format_instructions=output_format_instructions
+        )
+
+    @staticmethod
+    def _build_output_format_instructions(include_reason: bool) -> str:
+        if include_reason:
+            return (
+                "Respond with EXACTLY two lines and no extra text:\n"
+                "GRADE: <A-J>\n"
+                "REASON: <ONE concise Arabic sentence justifying the grade>\n"
+                "Do not output markdown, bullet points, or additional commentary."
+            )
+        return (
+            "Respond with EXACTLY one line and no extra text:\n"
+            "GRADE: <A-J>\n"
+            "Do not include any explanation, reasoning, or additional text."
         )
 
     @classmethod
-    def parse_grade(cls, grade_text: str) -> float:
-        grade = grade_text.strip().upper()
-        if grade in cls.GRADE_TO_SCORE:
-            return cls.GRADE_TO_SCORE[grade]
-        return 0.10
+    def parse_response(cls, raw_response: str, include_reason: bool = False) -> tuple[float, str | None]:
+        if not raw_response:
+            return 0.10, None
+
+        grade_match = re.search(r"GRADE\s*[:\-]\s*([A-J])\b", raw_response, flags=re.IGNORECASE)
+        grade = grade_match.group(1).upper() if grade_match else None
+        
+        if not grade:
+            # Fallback to looking for A-J anywhere if the structured format failed
+            for char in raw_response.strip().upper():
+                if char in 'ABCDEFGHIJ':
+                    grade = char
+                    break
+        
+        score = cls.GRADE_TO_SCORE.get(grade, 0.10)
+        
+        justification = None
+        if include_reason:
+            reason_match = re.search(r"REASON\s*[:\-]\s*(.+)", raw_response, flags=re.IGNORECASE | re.DOTALL)
+            if reason_match:
+                justification = reason_match.group(1).strip()
+                
+        return score, justification
